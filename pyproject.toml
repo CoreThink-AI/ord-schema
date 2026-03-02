@@ -1,7 +1,14 @@
 [project]
 name = "ord-schema"
-version = "0.3.96"
-description = "Add your description here"
+version = "0.3.99"
+description = "Schema for the Open Reaction Database"
+# url = 'https://github.com/Open-Reaction-Database/ord-schema'"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+# package_data={"ord_schema.proto": ["*.pyi"]}
 readme = "README.md"
 authors = [
     { name = "hobs", email = "git@totalgood.com" }
@@ -26,23 +33,7 @@ dependencies = [
     "tqdm>=4.61.2",
 ]
 
-[tool.black]
-line-length = 120
-extend-exclude = "_pb2.py"
-
-[tool.isort]
-skip_glob = ["**/*_pb2.py*"]
-line_length = 120
-profile = "black"
-
-[tool.pytype]
-inputs = ["ord_schema"]
-exclude = ["**/*_test.py", "**/test_*.py", "**/*_pb2.py", "build/", "dist/"]
-keep_going = true
-disable = ["module-attr", "pyi-error"]
-jobs = 0
-
-[dependency-groups]
+[project.optional-dependencies]
 docs = [
     "Pygments>=2.13.0",
     "Sphinx>=5.3.0",
@@ -68,6 +59,23 @@ tests = [
     "testing-postgresql>=1.3.0",
     "treon>=0.1.3",
 ]
+
+
+[tool.black]
+line-length = 120
+extend-exclude = "_pb2.py"
+
+[tool.isort]
+skip_glob = ["**/*_pb2.py*"]
+line_length = 120
+profile = "black"
+
+[tool.pytype]
+inputs = ["ord_schema"]
+exclude = ["**/*_test.py", "**/test_*.py", "**/*_pb2.py", "build/", "dist/"]
+keep_going = true
+disable = ["module-attr", "pyi-error"]
+jobs = 0
 
 [build-system]
 requires = ["uv_build>=0.9.24,<0.10.0"]
