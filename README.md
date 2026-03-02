@@ -16,7 +16,7 @@ You **MUST** first install git-lfs and clone the [ord-data](https://github.com/o
 $ curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.python.sh | bash
 $ git lfs install
 $ git clone https://github.com/open-reaction-database/ord-data
-$ git clone https://github.com/open-reaction-database/ord-schema
+$ git clone https://github.com/hobson/ord-schema
 $ cd ord-schema
 $ uv venv -p 3.12
 $ source .venv/bin/activate
