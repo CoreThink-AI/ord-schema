@@ -12,38 +12,38 @@ designed to store the database schema and tools for creating, validating, and su
 
 ## Installation
 
-```shell
-$ sudo apt install git-lfs
+1. install and initialize git-lfs
+2. clone ord-data and ord-schema
+3. create ord-schema/.venv/
+4. install ord-schema in venv
+5. run expore_schema.py
+
+```bash
+$ curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.python.sh | bash
 $ git lfs install
 $ git clone https://github.com/open-reaction-database/ord-data
 $ git clone https://github.com/open-reaction-database/ord-schema
 $ cd ord-schema
-$ pip install ord-schema
+$ uv venv -p 3.12
+$ source .venv/bin/activate
+$ uv pip install -e .[docs,tests,examples]
+$ python explore_data.py
 ```
+
+If you make changes to the protocol buffer definitions, [install](https://grpc.io/docs/protoc-installation/) `protoc`
+and run `./compile_proto_wrappers.sh` to rebuild the wrappers.
 
 ## Examples
 
 The `examples/` directory contains examples of dataset creation and use. To run locally, install with:
 
-```shell
-$ pip install "ord-schema[examples]"
+```bash
+cd examples
+jupyter-lab
 ```
 
 Click here to run the examples with Binder:
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/open-reaction-database/ord-schema/HEAD?labpath=examples)
-
-## Development
-
-To install in editable/development mode:
-
-```shell
-$ git clone https://github.com/open-reaction-database/ord-schema.git
-$ cd ord-schema
-$ pip install -e .
-```
-
-If you make changes to the protocol buffer definitions, [install](https://grpc.io/docs/protoc-installation/) `protoc`
-and run `./compile_proto_wrappers.sh` to rebuild the wrappers.
 
 ## Conventions
 
