@@ -68,3 +68,7 @@ UnitMessage = Union[
     reaction_pb2.Volume,
     reaction_pb2.Wavelength,
 ]
+
+def hello():
+    print('This is the ord_schema.hello() fun')
+
