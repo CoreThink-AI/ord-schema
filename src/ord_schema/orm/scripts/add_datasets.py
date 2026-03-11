@@ -23,7 +23,7 @@ Options:
     --overwrite             Update changed datasets
     --dsn=<str>             Postgres connection string
     --database=<str>        Database [default: orm]
-    --username=<str>        Database username [default: postgres]
+    --username=<str>        Database username [default: hobs]
     --password=<str>        Database password
     --host=<str>            Database host [default: localhost]
     --port=<int>            Database port [default: 5432]
@@ -48,14 +48,20 @@ from tqdm import tqdm
 
 from ord_schema.logging import get_logger
 from ord_schema.message_helpers import load_message
-from ord_schema.orm import database
+from ord_schema.orm import database as db
 from ord_schema.proto import dataset_pb2
+from ord_schema.constants import PG_URL, PG_HOST, PG_PORT, PG_PASSWORD, PG_USERNAME, PG_DATABASE
+
+DEFAULT_PB_FILENAME = 'ord_dataset-68cb8b4b2b384e3d85b5b1efae58b203.pb.gz'
 
 logger = get_logger(__name__)
 dotenv.load_dotenv()
 
 
-def add_dataset(dsn: str, filename: str, overwrite: bool) -> str:
+def add_dataset(
+        dsn: str = PG_URL,
+        filename: str = 'DEFAULT_PB_FILENAME',
+        overwrite: bool = False) -> str:
     """Adds a single dataset to the database.
 
     Args:
@@ -76,7 +82,7 @@ def add_dataset(dsn: str, filename: str, overwrite: bool) -> str:
     engine = create_engine(dsn)
     with Session(engine) as session:
         with session.begin():
-            dataset_md5 = database.get_dataset_md5(dataset.dataset_id, session)
+            dataset_md5 = db.get_dataset_md5(dataset.dataset_id, session)
         if dataset_md5 is not None:
             this_md5 = md5(dataset.SerializeToString(deterministic=True)).hexdigest()
             if this_md5 != dataset_md5:
@@ -84,13 +90,13 @@ def add_dataset(dsn: str, filename: str, overwrite: bool) -> str:
                     raise ValueError(f"`overwrite` is required when a dataset already exists: {dataset.dataset_id}")
                 logger.debug(f"existing dataset {dataset.dataset_id} changed; updating")
                 with session.begin():
-                    database.delete_dataset(dataset.dataset_id, session)
+                    db.delete_dataset(dataset.dataset_id, session)
             else:
                 logger.debug(f"existing dataset {dataset.dataset_id} unchanged; skipping")
                 return dataset.dataset_id
         start = time.time()
         with session.begin():
-            database.add_dataset(dataset, session, rdkit_cartridge=False)  # Do this separately in add_rdkit().
+            db.add_dataset(dataset, session, rdkit_cartridge=False)  # Do this separately in add_rdkit().
         logger.debug(f"add_dataset() took {time.time() - start:g}s")
     return dataset.dataset_id
 
@@ -99,26 +105,23 @@ def add_rdkit(engine: Engine, dataset_id: str) -> None:
     """Updates RDKit tables."""
     with Session(engine) as session:
         with session.begin():
-            database.update_rdkit_tables(dataset_id, session)
+            db.update_rdkit_tables(dataset_id, session)
         with session.begin():
-            database.update_rdkit_ids(dataset_id, session)
+            db.update_rdkit_ids(dataset_id, session)
 
 
-def main(**kwargs):
+def main(dsn=PG_URL, database=PG_DATABASE, username=PG_USERNAME, password=PG_PASSWORD, host=PG_HOST, port=PG_PORT, **kwargs):
     RDLogger.DisableLog("rdApp.*")
-    if kwargs["--debug"]:
-        get_logger(database.__name__, level=logging.DEBUG)
-    if kwargs["--dsn"]:
-        dsn = kwargs["--dsn"]
-    else:
-        dsn = database.get_connection_string(
-            database=kwargs["--database"],
-            username=kwargs["--username"],
-            password=kwargs["--password"] or os.environ["PGPASSWORD"],
-            host=kwargs["--host"],
-            port=int(kwargs["--port"]),
-        )
-    filenames = sorted(glob(kwargs["--pattern"]))
+    if kwargs.get("--debug", None):
+        get_logger(db.__name__, level=logging.DEBUG)
+    # port = int(port or kwargs.get("--port", kwargs.get("-p", PG_PORT)))
+    dsn = kwargs.get("--dsn", kwargs.get("--url", None)) or f'postgresql+psycopg2://{username}:{password}@{host}:{port}/{database}'
+    pattern = kwargs.get("--pattern", f"{DEFAULT_PB_FILENAME}")
+    filenames = sorted(glob(pattern))
+    if not filenames:
+        raise FileNotFoundError(f'Path.glob("{pattern}") has no files!')
+    for n in filenames:
+        print(n)
     with ExitStack() as stack:
         max_workers = int(kwargs["--n_jobs"])
         if max_workers > 1:
@@ -152,6 +155,18 @@ def main(**kwargs):
 
 
 if __name__ == "__main__":
-    kwargs = docopt(__doc__)
-    kwargs['--password'] = kwargs.get('--password', '') or dict(os.environ).get('DB_PASSWORD', 'password')
+    kwargs = {}
+    kwargs = {
+        '--debug': True,
+        '--database': kwargs.get("--database", kwargs.get("-d", PG_DATABASE)),
+        '--username': kwargs.get("--username", kwargs.get("-u", PG_USERNAME)),
+        '--password': kwargs.get("--password", kwargs.get("-P", PG_PASSWORD)),
+        '--host': kwargs.get("--host", kwargs.get("-h", PG_HOST)),
+        '--port': int(kwargs.get("--port", kwargs.get("-p", PG_PORT))),
+        '--dsn': kwargs.get("--dsn", kwargs.get("--url", PG_URL)),
+        '--overwrite': False,
+        '--n_jobs': 1,
+        '--overwrite': False,
+        }
+    kwargs.update(docopt(__doc__))
     main(**kwargs)

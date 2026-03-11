@@ -18,7 +18,7 @@ import os
 import time
 from unittest.mock import patch
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select, text, create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import NotSupportedError, OperationalError
 from sqlalchemy.orm import Session
@@ -26,12 +26,13 @@ from sqlalchemy.orm import Session
 from ord_schema.logging import get_logger
 from ord_schema.orm.mappers import Base, Mappers, from_proto
 from ord_schema.proto import dataset_pb2
+from ord_schema.constants import PG_URL
 
 logger = get_logger(__name__)
 dotenv.load_dotenv()
 
 
-def prepare_database(engine: Engine) -> bool:
+def prepare_database(engine: Engine = None) -> bool:
     """Prepares the database and creates the ORM table structure.
 
     Args:
@@ -40,6 +41,9 @@ def prepare_database(engine: Engine) -> bool:
     Returns:
         Whether the RDKit PostgreSQL cartridge is installed.
     """
+    if engine is None:
+        engine = create_engine(PG_URL)
+
     with engine.begin() as connection:
         try:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS tsm_system_rows"))  # For random sampling.
