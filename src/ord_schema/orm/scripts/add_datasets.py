@@ -20,15 +20,15 @@ Usage:
 
 Options:
     --pattern=<str>         Pattern for dataset filenames
-    --overwrite             Update changed datasets
-    --dsn=<str>             Postgres connection string
-    --database=<str>        Database [default: orm]
-    --username=<str>        Database username [default: hobs]
-    --password=<str>        Database password
-    --host=<str>            Database host [default: localhost]
-    --port=<int>            Database port [default: 5432]
-    --n_jobs=<int>          Number of parallel workers [default: 1]
-    --debug                 Enable debug logging.
+    # --overwrite             Update changed datasets [default: True]
+    # --dsn=<str>             Postgres connection string
+    # --database=<str>        Database [default: orm]
+    # --username=<str>        Database username [default: hobs]
+    # --password=<str>        Database password
+    # --host=<str>            Database host [default: localhost]
+    # --port=<int>            Database port [default: 5432]
+    # --n_jobs=<int>          Number of parallel workers [default: 1]
+    # --debug                 Enable debug logging [default: True].
 """
 import dotenv
 import logging
@@ -61,7 +61,7 @@ dotenv.load_dotenv()
 def add_dataset(
         dsn: str = PG_URL,
         filename: str = 'DEFAULT_PB_FILENAME',
-        overwrite: bool = False) -> str:
+        overwrite: bool = True) -> str:
     """Adds a single dataset to the database.
 
     Args:
@@ -85,10 +85,10 @@ def add_dataset(
             dataset_md5 = db.get_dataset_md5(dataset.dataset_id, session)
         if dataset_md5 is not None:
             this_md5 = md5(dataset.SerializeToString(deterministic=True)).hexdigest()
-            if this_md5 != dataset_md5:
+            if overwrite or this_md5 != dataset_md5:
                 if not overwrite:
+                    logger.debug(f"existing dataset {dataset.dataset_id} changed; updating")
                     raise ValueError(f"`overwrite` is required when a dataset already exists: {dataset.dataset_id}")
-                logger.debug(f"existing dataset {dataset.dataset_id} changed; updating")
                 with session.begin():
                     db.delete_dataset(dataset.dataset_id, session)
             else:
@@ -96,6 +96,7 @@ def add_dataset(
                 return dataset.dataset_id
         start = time.time()
         with session.begin():
+            print(f'db.add_dataset(dataset.dataset_id:{dataset.dataset_id}, rdkit_cartridge=False)')
             db.add_dataset(dataset, session, rdkit_cartridge=False)  # Do this separately in add_rdkit().
         logger.debug(f"add_dataset() took {time.time() - start:g}s")
     return dataset.dataset_id
@@ -141,6 +142,7 @@ def main(dsn=PG_URL, database=PG_DATABASE, username=PG_USERNAME, password=PG_PAS
             except Exception as error:  # pylint: disable=broad-exception-caught
                 filename = futures[future]
                 failures.append(filename)
+                print(filename, error)
                 logger.error(f"Adding dataset {filename} failed: {error}")
     logger.info("Adding RDKit functionality")
     engine = create_engine(dsn)
@@ -151,12 +153,14 @@ def main(dsn=PG_URL, database=PG_DATABASE, username=PG_USERNAME, password=PG_PAS
             failures.append(dataset_id)
             logger.error(f"Adding RDKit functionality for {dataset_id} failed: {error}")
     if failures:
+        print(failures)
         raise RuntimeError(failures)
 
 
 if __name__ == "__main__":
     kwargs = {}
-    kwargs = {
+    kwargs.update(docopt(__doc__))
+    kwargs.update({
         '--debug': True,
         '--database': kwargs.get("--database", kwargs.get("-d", PG_DATABASE)),
         '--username': kwargs.get("--username", kwargs.get("-u", PG_USERNAME)),
@@ -164,9 +168,22 @@ if __name__ == "__main__":
         '--host': kwargs.get("--host", kwargs.get("-h", PG_HOST)),
         '--port': int(kwargs.get("--port", kwargs.get("-p", PG_PORT))),
         '--dsn': kwargs.get("--dsn", kwargs.get("--url", PG_URL)),
-        '--overwrite': False,
+        '--overwrite': True,
         '--n_jobs': 1,
-        '--overwrite': False,
-        }
-    kwargs.update(docopt(__doc__))
+        })
+    # 
+
+    # kwargs['--debug': True,
+    #     '--database': kwargs.get("--database", kwargs.get("-d", PG_DATABASE)),
+    #     '--username': kwargs.get("--username", kwargs.get("-u", PG_USERNAME)),
+    #     '--password': kwargs.get("--password", kwargs.get("-P", PG_PASSWORD)),
+    #     '--host': kwargs.get("--host", kwargs.get("-h", PG_HOST)),
+    #     '--port': int(kwargs.get("--port", kwargs.get("-p", PG_PORT))),
+    #     '--dsn': kwargs.get("--dsn", kwargs.get("--url", PG_URL)),
+    #     '--overwrite': True,
+    #     '--n_jobs': 1,
+    #     })
+
+    # kwargs.update(docopt(__doc__))
+    print(kwargs)
     main(**kwargs)
