@@ -1,3 +1,7 @@
+.env
+.venv
+*.pyc
+
 # PyCharm files.
 .idea/
 # Generated docs output.
