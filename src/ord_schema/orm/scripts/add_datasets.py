@@ -41,7 +41,6 @@ from hashlib import md5
 
 from docopt import docopt
 from rdkit import RDLogger
-from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from tqdm import tqdm
@@ -50,7 +49,7 @@ from ord_schema.logging import get_logger
 from ord_schema.message_helpers import load_message
 from ord_schema.orm import database as db
 from ord_schema.proto import dataset_pb2
-from ord_schema.constants import PG_URL, PG_HOST, PG_PORT, PG_PASSWORD, PG_USERNAME, PG_DATABASE
+# from ord_schema.constants import PG_URL, PG_HOST, PG_PORT, PG_PASSWORD, PG_USERNAME, PG_DATABASE
 
 DEFAULT_PB_FILENAME = 'ord_dataset-68cb8b4b2b384e3d85b5b1efae58b203.pb.gz'
 
@@ -59,7 +58,7 @@ dotenv.load_dotenv()
 
 
 def add_dataset(
-        dsn: str = PG_URL,
+        dsn: str = None,
         filename: str = 'DEFAULT_PB_FILENAME',
         overwrite: bool = True) -> str:
     """Adds a single dataset to the database.
@@ -79,7 +78,7 @@ def add_dataset(
     dataset = load_message(filename, dataset_pb2.Dataset)
     # NOTE(skearnes): Multiprocessing is hard to get right for shared connection pools, so we don't even try; see
     # https://docs.sqlalchemy.org/en/20/core/pooling.html#using-connection-pools-with-multiprocessing-or-os-fork.
-    engine = create_engine(dsn)
+    engine = db.create_engine()
     with Session(engine) as session:
         with session.begin():
             dataset_md5 = db.get_dataset_md5(dataset.dataset_id, session)
@@ -145,7 +144,7 @@ def main(dsn=PG_URL, database=PG_DATABASE, username=PG_USERNAME, password=PG_PAS
                 print(filename, error)
                 logger.error(f"Adding dataset {filename} failed: {error}")
     logger.info("Adding RDKit functionality")
-    engine = create_engine(dsn)
+    engine = db.create_engine()
     for dataset_id in tqdm(dataset_ids):
         try:
             add_rdkit(engine, dataset_id)  # NOTE(skearnes): Do this serially to avoid deadlocks.

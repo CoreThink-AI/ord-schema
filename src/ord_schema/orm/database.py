@@ -18,8 +18,11 @@ import os
 import time
 from unittest.mock import patch
 
-from sqlalchemy import delete, select, text, create_engine
+from sqlalchemy import delete, select, text
+import sqlalchemy
 from sqlalchemy.engine import Engine
+from sqlalchemy.ext.asyncio import create_async_engine as sqlalchemy_create_async_engine
+
 from sqlalchemy.exc import NotSupportedError, OperationalError
 from sqlalchemy.orm import Session
 
@@ -32,6 +35,33 @@ logger = get_logger(__name__)
 dotenv.load_dotenv()
 
 
+def create_engine(url=PG_URL, connect_args=None, echo=True, **kwargs):
+    """ Override sqlalchemy defaults with ORD-schema and PubChem database defaults """
+    # equivalent to `psql -d ord -u hobs 'SET search_path = ag_catalog, "$user", public, ord, pubchem;'`
+    schema_search_priority = 'ag_catalog, hobs, public, ord, pubchem'
+    connect_args_default = {'options': f'-csearch_path={schema_search_priority}'}
+    if connect_args is not None:
+        connect_args_default.update(connect_args)
+    print(f'engine = create_engine({repr(url)}, connect_args={connect_args_default}, echo={echo}, **{kwargs})')
+    engine = sqlalchemy.create_engine(url, connect_args=connect_args_default, echo=echo, **kwargs)
+    print(engine)
+    return engine
+
+
+def create_async_engine(url=PG_URL, connect_args=None, echo=True, **kwargs):
+    """ Override sqlalchemy defaults with ORD-schema and PubChem database defaults """
+    print(f'create_async_engine.url = {repr(url)}')
+
+    # equivalent to `psql -d ord -u hobs 'SET search_path = ag_catalog, "$user", public, ord, pubchem;'`
+    schema_search_priority = 'ag_catalog, hobs, public, ord, pubchem'
+    connect_args_default = {'options': f'-csearch_path={schema_search_priority}'}
+    if connect_args is not None:
+        connect_args_default.update(connect_args)
+    print(f'engine = create_async_engine({repr(url)}, connect_args={connect_args_default}, echo={echo}, **{kwargs})')
+    engine = sqlalchemy_create_async_engine(url, connect_args=connect_args_default, echo=echo, **kwargs)
+    print(engine)
+    return engine
+
 def prepare_database(engine: Engine = None) -> bool:
     """Prepares the database and creates the ORM table structure.
 
@@ -41,9 +71,15 @@ def prepare_database(engine: Engine = None) -> bool:
     Returns:
         Whether the RDKit PostgreSQL cartridge is installed.
     """
-    if engine is None:
-        engine = create_engine(PG_URL)
+    namespace_search_priority = 'public,ord,pubchem' # Searches left-to-right
 
+    if engine is None:
+        engine = create_engine()
+        # # equivalent to `psql -d ord -u hobs 'SET search_path = ag_catalog, "$user", public, ord, pubchem;'`
+        # schema_search_priority = 'ag_catalog, hobs, public, ord, pubchem'
+        # connection_args = {'options': f'-csearch_path={schema_search_priority}'}
+        # engine = sqlalchemy.create_engine(PG_URL, connect_args=connect_args)
+        
     with engine.begin() as connection:
         try:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS tsm_system_rows"))  # For random sampling.
